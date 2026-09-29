@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cycle P&amp;L Pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#F6F7F9;
+  --surface:#FFFFFF;
+  --sunk:#EDEFF3;
+  --ink:#171B21;
+  --ink-2:#4A5462;
+  --ink-3:#78838F;
+  --rule:#DCE0E7;
+  --rule-soft:#E8EBF0;
+  --accent:#2B4C7E;
+  --accent-soft:#E4EAF4;
+  --nf:#9A5B10;
+  --nf-soft:#F6EBDC;
+  --sx:#0E6360;
+  --sx-soft:#DEEDEC;
+  --pos:#14713F;
+  --neg:#A8271D;
+  --warn:#8A5B00;
+  --warn-soft:#FBF1DC;
+  --shadow:0 1px 2px rgba(23,27,33,.06),0 8px 20px -12px rgba(23,27,33,.18);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#11141A;
+    --surface:#171B22;
+    --sunk:#1E232C;
+    --ink:#E8ECF2;
+    --ink-2:#A7B1BF;
+    --ink-3:#7C8794;
+    --rule:#2A313C;
+    --rule-soft:#232A34;
+    --accent:#8FB3E6;
+    --accent-soft:#1D2938;
+    --nf:#D9A15C;
+    --nf-soft:#2B2318;
+    --sx:#5FBDB6;
+    --sx-soft:#152927;
+    --pos:#5FBE87;
+    --neg:#E68A80;
+    --warn:#D9AE5F;
+    --warn-soft:#2A2317;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 20px -12px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#11141A;
+  --surface:#171B22;
+  --sunk:#1E232C;
+  --ink:#E8ECF2;
+  --ink-2:#A7B1BF;
+  --ink-3:#7C8794;
+  --rule:#2A313C;
+  --rule-soft:#232A34;
+  --accent:#8FB3E6;
+  --accent-soft:#1D2938;
+  --nf:#D9A15C;
+  --nf-soft:#2B2318;
+  --sx:#5FBDB6;
+  --sx-soft:#152927;
+  --pos:#5FBE87;
+  --neg:#E68A80;
+  --warn:#D9AE5F;
+  --warn-soft:#2A2317;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 20px -12px rgba(0,0,0,.6);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font:400 16px/1.65 "IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+.wrap{max-width:1120px;margin:0 auto;padding:0 28px 96px}
+code,.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+h1,h2,h3{font-family:"Zilla Slab",Georgia,serif;text-wrap:balance;margin:0}
+a{color:var(--accent)}
+
+/* ---- masthead ---- */
+header.top{border-bottom:1px solid var(--rule);background:var(--surface)}
+.top-in{max-width:1120px;margin:0 auto;padding:44px 28px 36px;display:flex;flex-direction:column;gap:18px}
+.kicker{
+  font:600 11px/1 "IBM Plex Mono",monospace;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-3);
+}
+h1{font-size:clamp(30px,4.4vw,46px);font-weight:600;letter-spacing:-.015em;line-height:1.1}
+.standfirst{max-width:64ch;color:var(--ink-2);font-size:17.5px;margin:0}
+.facts{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--rule);border-radius:3px;overflow:hidden;margin-top:6px}
+.fact{flex:1 1 150px;padding:12px 16px;border-right:1px solid var(--rule);background:var(--surface)}
+.fact:last-child{border-right:0}
+.fact dt{font:600 10.5px/1 "IBM Plex Mono",monospace;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);margin:0 0 6px}
+.fact dd{margin:0;font:600 19px/1 "IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;color:var(--ink)}
+.fact dd small{font-size:12px;font-weight:400;color:var(--ink-3);letter-spacing:0}
+
+/* ---- run strip ---- */
+.run{background:var(--sunk);border-bottom:1px solid var(--rule)}
+.run-in{max-width:1120px;margin:0 auto;padding:18px 28px;display:flex;flex-wrap:wrap;gap:20px;align-items:baseline}
+.run code{font-size:13.5px;background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:4px 9px}
+.run .note{color:var(--ink-2);font-size:13.5px}
+
+/* ---- section rhythm ---- */
+section{padding-top:52px}
+.sec-head{display:flex;align-items:baseline;gap:14px;border-bottom:2px solid var(--ink);padding-bottom:8px;margin-bottom:26px}
+.step-no{
+  font:600 12px/1 "IBM Plex Mono",monospace;letter-spacing:.1em;color:var(--surface);
+  background:var(--ink);padding:5px 8px;border-radius:2px;flex:none;
+}
+.sec-head h2{font-size:24px;font-weight:600;letter-spacing:-.01em}
+.sec-head .sub{margin-left:auto;font:400 13px/1 "IBM Plex Mono",monospace;color:var(--ink-3);white-space:nowrap}
+p{max-width:70ch}
+p,ul,ol{margin:0 0 16px}
+ul,ol{padding-left:20px;max-width:70ch}
+li{margin-bottom:6px}
+strong{font-weight:600}
+
+/* ---- tables ---- */
+.scroll{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;background:var(--surface);margin:0 0 22px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:8px 13px;text-align:left;border-bottom:1px solid var(--rule-soft);white-space:nowrap}
+thead th{
+  background:var(--sunk);font:600 10.5px/1.3 "IBM Plex Mono",monospace;
+  letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2);vertical-align:bottom;
+}
+tbody tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+.neg{color:var(--neg)}
+.pos{color:var(--pos)}
+.blank{color:var(--ink-3)}
+tbody th{font-weight:600;font-size:13.5px}
+.grp{border-left:1px solid var(--rule)}
+caption{caption-side:top;text-align:left;padding:10px 13px;font:500 12.5px/1.4 "IBM Plex Sans";color:var(--ink-2);background:var(--surface);border-bottom:1px solid var(--rule)}
+
+/* ---- formula block ---- */
+.formula{
+  background:var(--sunk);border-left:3px solid var(--accent);border-radius:0 3px 3px 0;
+  padding:14px 18px;margin:0 0 20px;font-family:"IBM Plex Mono",monospace;font-size:13.5px;
+  line-height:1.75;white-space:pre;overflow-x:auto;color:var(--ink);
+}
+.formula .cm{color:var(--ink-3)}
+
+/* ---- cycle diagram ---- */
+.cycles{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px;margin-bottom:24px}
+.cyc{border:1px solid var(--rule);border-radius:3px;background:var(--surface);padding:16px 18px 18px}
+.cyc h3{font-size:15px;font-weight:600;display:flex;align-items:center;gap:9px;margin-bottom:14px}
+.tag{font:600 10px/1 "IBM Plex Mono",monospace;letter-spacing:.1em;padding:4px 6px;border-radius:2px}
+.tag.nf{background:var(--nf-soft);color:var(--nf)}
+.tag.sx{background:var(--sx-soft);color:var(--sx)}
+.days{display:flex;align-items:stretch;gap:6px}
+.day{flex:1;text-align:center;border:1px solid var(--rule);border-radius:2px;padding:8px 4px;background:var(--ground)}
+.day .d{font:600 10px/1 "IBM Plex Mono",monospace;letter-spacing:.08em;color:var(--ink-3)}
+.day .t{font:600 13px/1 "IBM Plex Mono",monospace;margin-top:6px;color:var(--ink-2)}
+.day.end{background:var(--accent-soft);border-color:var(--accent)}
+.day.end .t{color:var(--accent)}
+.cyc p{font-size:13px;color:var(--ink-2);margin:13px 0 0;max-width:none}
+
+/* ---- rules list ---- */
+.rules{display:flex;flex-direction:column;gap:0;border:1px solid var(--rule);border-radius:3px;overflow:hidden;margin-bottom:22px}
+.rule-row{display:flex;gap:16px;align-items:baseline;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--rule-soft)}
+.rule-row:last-child{border-bottom:0}
+.rule-row .n{font:600 11px/1 "IBM Plex Mono",monospace;color:var(--ink-3);flex:none;width:16px}
+.rule-row .txt{flex:1;font-size:14.5px}
+.rule-row .ct{font:500 13.5px/1 "IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);flex:none}
+.rule-row.total{background:var(--sunk);font-weight:600}
+.rule-row.total .txt,.rule-row.total .ct{color:var(--ink);font-weight:600}
+
+/* ---- callouts ---- */
+.note-box{border:1px solid var(--rule);border-left:3px solid var(--accent);background:var(--surface);border-radius:0 3px 3px 0;padding:14px 18px;margin:0 0 20px}
+.note-box.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+.note-box p:last-child{margin-bottom:0}
+.note-box .lbl{font:600 10.5px/1 "IBM Plex Mono",monospace;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);display:block;margin-bottom:7px}
+
+/* ---- two-up ---- */
+.duo{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-bottom:22px}
+.method{border:1px solid var(--rule);border-radius:3px;background:var(--surface);padding:18px}
+.method h3{font-size:16px;font-weight:600;margin-bottom:10px}
+.method .formula{margin-bottom:12px;font-size:12.5px}
+.method p{font-size:14px;color:var(--ink-2);margin:0;max-width:none}
+
+/* ---- issues ---- */
+.issue{border-top:1px solid var(--rule);padding:16px 0}
+.issue:first-of-type{border-top:2px solid var(--ink)}
+.issue h3{font-size:15.5px;font-weight:600;margin-bottom:6px;display:flex;gap:10px;align-items:baseline}
+.issue h3 .id{font:600 11px/1 "IBM Plex Mono",monospace;color:var(--ink-3)}
+.issue p{font-size:14.5px;color:var(--ink-2);margin:0}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--rule);color:var(--ink-3);font-size:13px}
+@media (max-width:640px){
+  .top-in,.run-in,.wrap{padding-left:18px;padding-right:18px}
+  .sec-head .sub{display:none}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <span class="kicker">build_workbook.py &middot; method &amp; results</span>
+    <h1>Cycle P&amp;L Pipeline</h1>
+    <p class="standfirst">How a raw <code>User_Details</code> export becomes cycle-wise and month-wise P&amp;L, split by intraday and positional running type across algos 1, 7 and 15 &mdash; every filter, every formula, and the figures they produce.</p>
+    <dl class="facts">
+      <div class="fact"><dt>Rows in</dt><dd>34,325</dd></div>
+      <div class="fact"><dt>Rows kept</dt><dd>16,171</dd></div>
+      <div class="fact"><dt>Cycles</dt><dd>35 <small>18 NF / 17 SX</small></dd></div>
+      <div class="fact"><dt>Account-cycles</dt><dd>10,036 <small>5,628 INT / 4,408 POS</small></dd></div>
+      <div class="fact"><dt>Period</dt><dd>MAY&ndash;SEP 26</dd></div>
+    </dl>
+  </div>
+</header>
+
+<div class="run">
+  <div class="run-in">
+    <code>python build_workbook.py</code>
+    <span class="note">Prompts for: User_Details CSV &rarr; Exceptions &rarr; Anand Rathi accounts (last two optional, blank to skip).</span>
+    <code>python test_build_workbook.py</code>
+    <span class="note">Self-checks.</span>
+  </div>
+</div>
+
+<div class="wrap">
+
+<section>
+  <div class="sec-head"><span class="step-no">01</span><h2>Filtering</h2><span class="sub">RawData &rarr; MainData</span></div>
+  <p>Five drop rules, applied in order; each logs its own row count. Before they run, <code>Algo</code> and <code>Allocation</code> are coerced to numeric (failures dropped with a warning) and <code>Index</code> / <code>DTE</code> are trimmed and upper-cased.</p>
+  <div class="rules">
+    <div class="rule-row"><span class="n">1</span><span class="txt">Algo not in {1, 7, 15}</span><span class="ct">&minus;9,128</span></div>
+    <div class="rule-row"><span class="n">2</span><span class="txt">Allocation below &#8377;1,00,00,000 &mdash; exactly 1 Cr is kept</span><span class="ct">&minus;7,695</span></div>
+    <div class="rule-row"><span class="n">3</span><span class="txt">Index not NF or SX &mdash; drops BNF and NF_SX</span><span class="ct">&minus;287</span></div>
+    <div class="rule-row"><span class="n">4</span><span class="txt">User ID on the exception list (17 IDs)</span><span class="ct">&minus;1,038</span></div>
+    <div class="rule-row"><span class="n">5</span><span class="txt">Account-cycle with no 0DTE row &mdash; see step 04</span><span class="ct">&minus;6</span></div>
+    <div class="rule-row total"><span class="n"></span><span class="txt">MainData</span><span class="ct">16,171</span></div>
+  </div>
+  <p>Input columns: <code>Date</code> (DD-Mon-YY), <code>User ID</code>, <code>Alias</code>, <code>Algo</code>, <code>Allocation</code> (rupees), <code>MTM</code>, <code>MTM&nbsp;%</code>, <code>Server</code>, <code>DTE</code>, <code>Index</code>. The exception and Anand Rathi files are single-column ID lists; the header may read <code>User_ID</code> or <code>userId</code>.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="step-no">02</span><h2>Cycle assignment</h2><span class="sub">35 cycles</span></div>
+  <p>A cycle is one expiry window. Rather than a holiday calendar, the script walks each index's dates in order: a cycle <em>ends</em> on a 0DTE date, and the next date after it opens a new one. A holiday simply produces a shorter cycle.</p>
+  <div class="cycles">
+    <div class="cyc">
+      <h3><span class="tag nf">NF</span> Friday &rarr; Tuesday</h3>
+      <div class="days">
+        <div class="day"><div class="d">FRI</div><div class="t">4DTE</div></div>
+        <div class="day"><div class="d">MON</div><div class="t">1DTE</div></div>
+        <div class="day end"><div class="d">TUE</div><div class="t">0DTE</div></div>
+      </div>
+      <p>Cycle ID <code>NF_2026-09-01</code> &mdash; the index plus its 0DTE date.</p>
+    </div>
+    <div class="cyc">
+      <h3><span class="tag sx">SX</span> Wednesday &rarr; Thursday</h3>
+      <div class="days">
+        <div class="day"><div class="d">WED</div><div class="t">1DTE</div></div>
+        <div class="day end"><div class="d">THU</div><div class="t">0DTE</div></div>
+      </div>
+      <p>Cycle ID <code>SX_2026-09-03</code>.</p>
+    </div>
+  </div>
+  <p>Holiday cases present in this data, all handled by the walk:</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Cycle</th><th>What happened</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">NF_2026-05-05</td><td>Friday holiday &mdash; no 4DTE day</td><td>1DTE+0DTE accounts still POS</td></tr>
+      <tr><td class="mono">NF_2026-06-30</td><td>Friday holiday &mdash; no 4DTE day</td><td>1DTE+0DTE accounts still POS</td></tr>
+      <tr><td class="mono">SX_2026-05-27</td><td>Wednesday holiday &mdash; 0DTE alone</td><td>every account in it is INT</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="step-no">03</span><h2>POS / INT classification</h2><span class="sub">per cycle &times; index &times; user &times; algo</span></div>
+  <div class="formula"><span class="cm">POS</span>  account traded on any non-0DTE day of its cycle
+<span class="cm">INT</span>  account traded on 0DTE only</div>
+  <p>That single rule covers every case without special-casing:</p>
+  <ul>
+    <li>NF 4DTE + 1DTE + 0DTE &rarr; <strong>POS</strong></li>
+    <li>NF 1DTE + 0DTE, Friday holiday, no 4DTE &rarr; <strong>POS</strong></li>
+    <li>SX 1DTE + 0DTE &rarr; <strong>POS</strong></li>
+    <li>0DTE only &rarr; <strong>INT</strong></li>
+    <li>a cycle where no non-0DTE day ran at all &rarr; everyone is <strong>INT</strong>, automatically</li>
+  </ul>
+  <p>Written to MainData as <code>Running Type</code>; the <code>AccountType</code> sheet carries one row per account-cycle with its DTE set. Result: <strong>5,628 INT</strong> and <strong>4,408 POS</strong> account-cycles.</p>
+  <div class="note-box">
+    <span class="lbl">Terminal check</span>
+    <p>Any <strong>NF</strong> cycle running 0DTE alone (both 4DTE and 1DTE missing &mdash; two holidays in one Fri&ndash;Tue window) is dumped in full to the terminal for manual review. None occur in the current data.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="step-no">04</span><h2>Allocation backfill</h2><span class="sub">73 rows &middot; 58 accounts</span></div>
+  <p>The <strong>0DTE row is the reference</strong> for its whole cycle. Within each cycle &times; index &times; user &times; algo, every non-0DTE row takes the account's 0DTE allocation &mdash; the SX 1DTE row, and the NF 4DTE and 1DTE rows.</p>
+  <p>Allocation is replaced in place with no original retained, and <code>MTM&nbsp;%</code> is recomputed as <code>MTM / new Allocation &times; 100</code> so the column stays consistent with it.</p>
+  <div class="note-box">
+    <span class="lbl">Guard</span>
+    <p>If an account ever shows two <em>different</em> 0DTE allocations inside one cycle, the script raises rather than silently picking one.</p>
+  </div>
+  <p>An account-cycle with 1DTE/4DTE rows but <strong>no 0DTE row</strong> has no reference allocation, so the entire account-cycle is dropped &mdash; printed to the terminal first. Six rows, five account-cycles:</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Date</th><th>Cycle</th><th>User ID</th><th>Alias</th><th class="num">Algo</th><th>DTE</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">08-May-26</td><td class="mono">NF_2026-05-12</td><td class="mono">DXX40</td><td>A8_MANISHT_DUB_8C</td><td class="num">1</td><td class="mono">4DTE</td></tr>
+      <tr><td class="mono">29-Jun-26</td><td class="mono">NF_2026-06-30</td><td class="mono">6954037</td><td>MSR_AJAY_TAMBI_POS</td><td class="num">1</td><td class="mono">1DTE</td></tr>
+      <tr><td class="mono">31-Jul-26</td><td class="mono">NF_2026-08-04</td><td class="mono">NS0008</td><td>CCV_SANJAY_MITTAL_2C</td><td class="num">1</td><td class="mono">4DTE</td></tr>
+      <tr><td class="mono">03-Aug-26</td><td class="mono">NF_2026-08-04</td><td class="mono">NS0008</td><td>CCV_SANJAY_MITTAL_2C</td><td class="num">1</td><td class="mono">1DTE</td></tr>
+      <tr><td class="mono">17-Jun-26</td><td class="mono">SX_2026-06-18</td><td class="mono">LOYALKAV</td><td>MSR_LOYALKAV_POS</td><td class="num">15</td><td class="mono">1DTE</td></tr>
+      <tr><td class="mono">08-Jul-26</td><td class="mono">SX_2026-07-09</td><td class="mono">6954037</td><td>MSR_AJAY_TAMBI_POS</td><td class="num">1</td><td class="mono">1DTE</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="step-no">05</span><h2>Normalisation to 1 Cr</h2><span class="sub">so size cannot dominate</span></div>
+  <div class="formula">factor          = Allocation / 1,00,00,000
+Norm Allocation = 1,00,00,000
+Norm MTM        = MTM / factor
+Norm MTM %      = Norm MTM / 1,00,00,000 &times; 100</div>
+  <p>A 2 Cr account contributes 1 Cr of allocation and half its MTM; a 5 Cr account one fifth.</p>
+  <div class="note-box">
+    <span class="lbl">Why row-level MTM % is unchanged</span>
+    <p>MTM&nbsp;% is a ratio, so scaling both numerator and denominator cancels out. Normalisation only bites once MTM is <strong>summed across accounts of different sizes</strong> &mdash; which is exactly what the next step does.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="step-no">06</span><h2>Cycle MTM %</h2><span class="sub">CycleMTM sheet &middot; 206 rows</span></div>
+  <p>Computed per cycle &times; index &times; algo &times; running type:</p>
+  <div class="formula">Total_Allocation = &Sigma;<sub>users</sub> ( that user's average Norm Allocation
+                       across the days it ran in the cycle )
+
+Cycle MTM %      = Sum_MTM / Total_Allocation &times; 100</div>
+  <p><strong>Why the per-user average comes first:</strong> a user counts its full 1 Cr <em>once</em> per cycle, however many days of that cycle it traded. A POS account running 4DTE+1DTE+0DTE and one running only 1DTE+0DTE both contribute 1 Cr. The denominator measures capital deployed, not capital-days.</p>
+  <div class="note-box">
+    <span class="lbl">Worked example &mdash; NF_2026-05-12, Algo 1, POS</span>
+    <p>67 users in the cycle; 49 ran all three days, 18 ran only two. Each user's average allocation is 1 Cr, so <code>Total_Allocation</code> = 67 &times; 1 Cr = <strong>&#8377;67,00,00,000</strong>. With <code>Sum_MTM</code> = &#8377;4,10,62,080, the <strong>Cycle MTM % is 6.13</strong>.</p>
+  </div>
+  <p>Columns: <code>Month</code>, <code>Cycle</code>, <code>Index</code>, <code>Algo</code>, <code>Running Type</code>, <code>Sum_MTM</code>, <code>Days</code>, <code>Accounts</code>, <code>Rows</code>, <code>Total_Allocation</code>, <code>Cycle MTM %</code>.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="step-no">07</span><h2>The two pivot methods</h2><span class="sub">they answer different questions</span></div>
+  <div class="duo">
+    <div class="method">
+      <h3>Sum daily mtm%</h3>
+      <div class="formula">&Sigma; ( Cycle MTM % ) over the group</div>
+      <p>Adds per-cycle <strong>ratios</strong>. Every cycle counts equally, however many accounts ran in it.</p>
+    </div>
+    <div class="method">
+      <h3>Avg daily mtm%</h3>
+      <div class="formula">&Sigma; Sum_MTM
+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;
+mean( Total_Allocation )</div>
+      <p>Pools the raw <strong>MTM</strong> instead, so cycles with more accounts carry proportionally more weight.</p>
+    </div>
+  </div>
+  <div class="note-box warn">
+    <span class="lbl">Reading them together</span>
+    <p>The two will not agree, and where they diverge sharply the cause is usually a cycle with an unusual account count &mdash; see issue 01 below. The Avg figure also <strong>scales with cycle count</strong>: MAY-26 spans seven cycles and SEP-26 only one, so those two cells are not directly comparable. The Sum column has no such property.</p>
+  </div>
+  <p><strong>Month assignment.</strong> A cycle belongs to the month of its <strong>0DTE (expiry) day</strong>. An NF cycle whose 4DTE falls in July but whose 0DTE falls in August counts entirely as August. Months are labelled <code>MMM-YY</code> so multi-year data cannot collide.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="step-no">08</span><h2>Cohorts</h2><span class="sub">3 populations &times; 2 methods</span></div>
+  <div class="scroll"><table>
+    <thead><tr><th>Column group</th><th>Population</th><th class="num">Rows</th></tr></thead>
+    <tbody>
+      <tr><td>Sum / Avg daily mtm%</td><td>everyone</td><td class="num">16,171</td></tr>
+      <tr><td>Excl AR Sum / Avg</td><td>everyone except Anand Rathi</td><td class="num">15,177</td></tr>
+      <tr><td>Anand Rathi Sum / Avg</td><td>Anand Rathi only</td><td class="num">994</td></tr>
+    </tbody>
+  </table></div>
+  <p>&ldquo;Excl AR&rdquo; plus &ldquo;Anand Rathi&rdquo; reconstitutes the plain columns. <strong>76 of the 87 listed Anand Rathi IDs</strong> reach MainData; the other 11 were filtered out upstream or are absent from the source.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="step-no">09</span><h2>Output workbook</h2><span class="sub">7 sheets</span></div>
+  <div class="scroll"><table>
+    <thead><tr><th>Sheet</th><th>Contents</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">RawData</td><td>the CSV verbatim &mdash; 34,325 rows</td></tr>
+      <tr><td class="mono">MainData</td><td>after all filters, with Cycle, CycleNo, Month, Running Type and the Norm columns &mdash; 16,171 rows</td></tr>
+      <tr><td class="mono">AccountType</td><td>one row per account-cycle: its DTE set and Running Type</td></tr>
+      <tr><td class="mono">POS</td><td>MainData filtered to POS</td></tr>
+      <tr><td class="mono">INT</td><td>MainData filtered to INT</td></tr>
+      <tr><td class="mono">CycleMTM</td><td>per cycle &times; index &times; algo &times; running type &mdash; the audit trail</td></tr>
+      <tr><td class="mono">Pivot</td><td>overall block on top, monthly block below</td></tr>
+    </tbody>
+  </table></div>
+  <p>Every pivot cell is verifiable from <code>CycleMTM</code>: filter to the month, algo and running type, then sum <code>Cycle MTM %</code> for the Sum method, or divide the sum of <code>Sum_MTM</code> by the mean of <code>Total_Allocation</code> for the Avg method. Output is written beside the input CSV as <code>User_Details_processed_YYYYMMDD_HHMMSS.xlsx</code> &mdash; timestamped, so no run overwrites another.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="step-no">10</span><h2>Results</h2><span class="sub">all figures in %</span></div>
+  <div class="scroll"><table>
+    <caption>Overall &mdash; NF and SX combined, all 35 cycles</caption>
+    <thead>
+      <tr>
+        <th rowspan="2">Algo</th>
+        <th class="num grp" colspan="2">Sum daily</th>
+        <th class="num grp" colspan="2">Avg daily</th>
+        <th class="num grp" colspan="2">Excl AR sum</th>
+        <th class="num grp" colspan="2">Excl AR avg</th>
+        <th class="num grp" colspan="2">AR sum</th>
+        <th class="num grp" colspan="2">AR avg</th>
+      </tr>
+      <tr>
+        <th class="num grp">INT</th><th class="num">POS</th>
+        <th class="num grp">INT</th><th class="num">POS</th>
+        <th class="num grp">INT</th><th class="num">POS</th>
+        <th class="num grp">INT</th><th class="num">POS</th>
+        <th class="num grp">INT</th><th class="num">POS</th>
+        <th class="num grp">INT</th><th class="num">POS</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><th>1</th>
+        <td class="num grp pos">3.83</td><td class="num pos">9.48</td>
+        <td class="num grp pos">1.40</td><td class="num pos">6.16</td>
+        <td class="num grp pos">4.05</td><td class="num pos">9.48</td>
+        <td class="num grp pos">2.39</td><td class="num pos">6.18</td>
+        <td class="num grp pos">0.11</td><td class="num neg">&minus;1.51</td>
+        <td class="num grp neg">&minus;2.76</td><td class="num neg">&minus;1.51</td></tr>
+      <tr><th>7</th>
+        <td class="num grp pos">7.52</td><td class="num pos">14.64</td>
+        <td class="num grp pos">5.88</td><td class="num pos">12.10</td>
+        <td class="num grp pos">7.62</td><td class="num pos">14.64</td>
+        <td class="num grp pos">6.37</td><td class="num pos">12.10</td>
+        <td class="num grp pos">6.12</td><td class="num blank">&mdash;</td>
+        <td class="num grp pos">3.78</td><td class="num blank">&mdash;</td></tr>
+      <tr><th>15</th>
+        <td class="num grp pos">5.63</td><td class="num pos">9.62</td>
+        <td class="num grp pos">2.33</td><td class="num pos">9.29</td>
+        <td class="num grp pos">5.59</td><td class="num pos">9.62</td>
+        <td class="num grp pos">2.99</td><td class="num pos">9.29</td>
+        <td class="num grp neg">&minus;0.69</td><td class="num blank">&mdash;</td>
+        <td class="num grp neg">&minus;3.28</td><td class="num blank">&mdash;</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="scroll"><table>
+    <caption>Monthly &mdash; each cycle counted in the month of its 0DTE day</caption>
+    <thead>
+      <tr>
+        <th rowspan="2">Month</th><th rowspan="2" class="num">Algo</th>
+        <th class="num grp" colspan="2">Sum daily</th>
+        <th class="num grp" colspan="2">Avg daily</th>
+        <th class="num grp" colspan="2">Excl AR sum</th>
+        <th class="num grp" colspan="2">Excl AR avg</th>
+        <th class="num grp" colspan="2">AR sum</th>
+        <th class="num grp" colspan="2">AR avg</th>
+      </tr>
+      <tr>
+        <th class="num grp">INT</th><th class="num">POS</th>
+        <th class="num grp">INT</th><th class="num">POS</th>
+        <th class="num grp">INT</th><th class="num">POS</th>
+        <th class="num grp">INT</th><th class="num">POS</th>
+        <th class="num grp">INT</th><th class="num">POS</th>
+        <th class="num grp">INT</th><th class="num">POS</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><th>MAY-26</th><td class="num">1</td>
+        <td class="num grp pos">4.67</td><td class="num pos">5.30</td>
+        <td class="num grp pos">4.63</td><td class="num pos">5.21</td>
+        <td class="num grp pos">4.73</td><td class="num pos">5.30</td>
+        <td class="num grp pos">4.72</td><td class="num pos">5.21</td>
+        <td class="num grp pos">4.19</td><td class="num blank">&mdash;</td>
+        <td class="num grp pos">3.87</td><td class="num blank">&mdash;</td></tr>
+      <tr><th></th><td class="num">7</td>
+        <td class="num grp pos">3.84</td><td class="num pos">5.48</td>
+        <td class="num grp pos">3.80</td><td class="num pos">5.42</td>
+        <td class="num grp pos">3.96</td><td class="num pos">5.48</td>
+        <td class="num grp pos">3.85</td><td class="num pos">5.42</td>
+        <td class="num grp pos">3.07</td><td class="num blank">&mdash;</td>
+        <td class="num grp pos">3.47</td><td class="num blank">&mdash;</td></tr>
+      <tr><th></th><td class="num">15</td>
+        <td class="num grp pos">6.79</td><td class="num pos">7.50</td>
+        <td class="num grp pos">6.74</td><td class="num pos">7.50</td>
+        <td class="num grp pos">6.79</td><td class="num pos">7.50</td>
+        <td class="num grp pos">6.74</td><td class="num pos">7.50</td>
+        <td class="num grp blank">&mdash;</td><td class="num blank">&mdash;</td>
+        <td class="num grp blank">&mdash;</td><td class="num blank">&mdash;</td></tr>
+
+      <tr><th>JUN-26</th><td class="num">1</td>
+        <td class="num grp neg">&minus;1.13</td><td class="num pos">0.39</td>
+        <td class="num grp neg">&minus;0.89</td><td class="num pos">0.54</td>
+        <td class="num grp neg">&minus;1.09</td><td class="num pos">0.39</td>
+        <td class="num grp neg">&minus;0.88</td><td class="num pos">0.54</td>
+        <td class="num grp neg">&minus;1.31</td><td class="num blank">&mdash;</td>
+        <td class="num grp neg">&minus;0.94</td><td class="num blank">&mdash;</td></tr>
+      <tr><th></th><td class="num">7</td>
+        <td class="num grp pos">2.08</td><td class="num pos">4.17</td>
+        <td class="num grp pos">2.18</td><td class="num pos">4.68</td>
+        <td class="num grp pos">2.18</td><td class="num pos">4.17</td>
+        <td class="num grp pos">2.23</td><td class="num pos">4.68</td>
+        <td class="num grp pos">1.78</td><td class="num blank">&mdash;</td>
+        <td class="num grp pos">1.99</td><td class="num blank">&mdash;</td></tr>
+      <tr><th></th><td class="num">15</td>
+        <td class="num grp neg">&minus;0.04</td><td class="num pos">1.81</td>
+        <td class="num grp neg">&minus;0.27</td><td class="num pos">1.66</td>
+        <td class="num grp neg">&minus;0.02</td><td class="num pos">1.81</td>
+        <td class="num grp neg">&minus;0.09</td><td class="num pos">1.66</td>
+        <td class="num grp">0.00</td><td class="num blank">&mdash;</td>
+        <td class="num grp neg">&minus;2.58</td><td class="num blank">&mdash;</td></tr>
+
+      <tr><th>JUL-26</th><td class="num">1</td>
+        <td class="num grp neg">&minus;0.20</td><td class="num pos">1.71</td>
+        <td class="num grp neg">&minus;0.27</td><td class="num pos">1.52</td>
+        <td class="num grp neg">&minus;0.24</td><td class="num pos">1.71</td>
+        <td class="num grp neg">&minus;0.30</td><td class="num pos">1.52</td>
+        <td class="num grp">0.00</td><td class="num blank">&mdash;</td>
+        <td class="num grp neg">&minus;0.16</td><td class="num blank">&mdash;</td></tr>
+      <tr><th></th><td class="num">7</td>
+        <td class="num grp pos">1.67</td><td class="num pos">3.11</td>
+        <td class="num grp pos">1.49</td><td class="num pos">3.05</td>
+        <td class="num grp pos">1.51</td><td class="num pos">3.11</td>
+        <td class="num grp pos">1.40</td><td class="num pos">3.05</td>
+        <td class="num grp pos">2.14</td><td class="num blank">&mdash;</td>
+        <td class="num grp pos">1.74</td><td class="num blank">&mdash;</td></tr>
+      <tr><th></th><td class="num">15</td>
+        <td class="num grp neg">&minus;1.65</td><td class="num pos">0.33</td>
+        <td class="num grp neg">&minus;1.91</td><td class="num pos">0.33</td>
+        <td class="num grp neg">&minus;1.70</td><td class="num pos">0.33</td>
+        <td class="num grp neg">&minus;1.91</td><td class="num pos">0.33</td>
+        <td class="num grp neg">&minus;0.69</td><td class="num blank">&mdash;</td>
+        <td class="num grp neg">&minus;1.28</td><td class="num blank">&mdash;</td></tr>
+
+      <tr><th>AUG-26</th><td class="num">1</td>
+        <td class="num grp pos">1.55</td><td class="num pos">3.44</td>
+        <td class="num grp neg">&minus;0.60</td><td class="num pos">1.30</td>
+        <td class="num grp pos">1.72</td><td class="num pos">3.44</td>
+        <td class="num grp neg">&minus;0.21</td><td class="num pos">1.30</td>
+        <td class="num grp neg">&minus;1.74</td><td class="num blank">&mdash;</td>
+        <td class="num grp neg">&minus;1.42</td><td class="num blank">&mdash;</td></tr>
+      <tr><th></th><td class="num">7</td>
+        <td class="num grp pos">0.05</td><td class="num pos">2.44</td>
+        <td class="num grp neg">&minus;0.63</td><td class="num pos">0.33</td>
+        <td class="num grp pos">0.09</td><td class="num pos">2.44</td>
+        <td class="num grp neg">&minus;0.43</td><td class="num pos">0.33</td>
+        <td class="num grp neg">&minus;0.74</td><td class="num blank">&mdash;</td>
+        <td class="num grp neg">&minus;0.82</td><td class="num blank">&mdash;</td></tr>
+      <tr><th></th><td class="num">15</td>
+        <td class="num grp pos">1.18</td><td class="num pos">0.94</td>
+        <td class="num grp neg">&minus;0.12</td><td class="num pos">1.24</td>
+        <td class="num grp pos">1.18</td><td class="num pos">0.94</td>
+        <td class="num grp neg">&minus;0.12</td><td class="num pos">1.24</td>
+        <td class="num grp blank">&mdash;</td><td class="num blank">&mdash;</td>
+        <td class="num grp blank">&mdash;</td><td class="num blank">&mdash;</td></tr>
+
+      <tr><th>SEP-26</th><td class="num">1</td>
+        <td class="num grp neg">&minus;1.06</td><td class="num neg">&minus;1.35</td>
+        <td class="num grp neg">&minus;1.06</td><td class="num neg">&minus;1.35</td>
+        <td class="num grp neg">&minus;1.07</td><td class="num neg">&minus;1.35</td>
+        <td class="num grp neg">&minus;1.07</td><td class="num neg">&minus;1.35</td>
+        <td class="num grp neg">&minus;1.03</td><td class="num neg">&minus;1.51</td>
+        <td class="num grp neg">&minus;1.03</td><td class="num neg">&minus;1.51</td></tr>
+      <tr><th></th><td class="num">7</td>
+        <td class="num grp neg">&minus;0.12</td><td class="num neg">&minus;0.56</td>
+        <td class="num grp neg">&minus;0.12</td><td class="num neg">&minus;0.56</td>
+        <td class="num grp neg">&minus;0.12</td><td class="num neg">&minus;0.56</td>
+        <td class="num grp neg">&minus;0.12</td><td class="num neg">&minus;0.56</td>
+        <td class="num grp neg">&minus;0.13</td><td class="num blank">&mdash;</td>
+        <td class="num grp neg">&minus;0.13</td><td class="num blank">&mdash;</td></tr>
+      <tr><th></th><td class="num">15</td>
+        <td class="num grp neg">&minus;0.65</td><td class="num neg">&minus;0.96</td>
+        <td class="num grp neg">&minus;0.65</td><td class="num neg">&minus;0.96</td>
+        <td class="num grp neg">&minus;0.65</td><td class="num neg">&minus;0.96</td>
+        <td class="num grp neg">&minus;0.65</td><td class="num neg">&minus;0.96</td>
+        <td class="num grp blank">&mdash;</td><td class="num blank">&mdash;</td>
+        <td class="num grp blank">&mdash;</td><td class="num blank">&mdash;</td></tr>
+    </tbody>
+  </table></div>
+  <p>AR POS is blank except SEP-26 Algo 1, and that is correct: of 994 Anand Rathi rows, <strong>991 are INT and 3 are POS</strong> &mdash; a single account, <code>HMT1P006</code>, in one cycle.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="step-no">!</span><h2>Known data issues</h2><span class="sub">verify before relying on these figures</span></div>
+
+  <div class="issue">
+    <h3><span class="id">01</span> NF_2026-08-11 is a thin cycle</h3>
+    <p>70 distinct accounts against 178&ndash;220 in every other cycle &mdash; 8 accounts on 4DTE and 12 on 1DTE for Algo 1, against 30 on 0DTE, and Algo 15 has no 4DTE or 1DTE rows in it at all. Because the Sum method weights every cycle equally, this partial cycle swings the AUG-26 figures hard, which is exactly why Sum and Avg diverge most in that month (Algo 1 INT: +1.55 against &minus;0.60). It reads as a partial data capture for 07-Aug and 10-Aug rather than a real trading pattern.</p>
+  </div>
+
+  <div class="issue">
+    <h3><span class="id">02</span> Eleven Anand Rathi IDs are missing</h3>
+    <p>76 of the 87 listed IDs reach MainData. The rest were either removed by steps 01&ndash;04 or never appear in the source file.</p>
+  </div>
+
+  <div class="issue">
+    <h3><span class="id">03</span> NS0008 ran 4DTE and 1DTE with no 0DTE</h3>
+    <p>In <code>NF_2026-08-04</code> &mdash; a combination that should not occur. Dropped by step 04, but worth checking whether the 0DTE row is missing from the source or the account squared off early.</p>
+  </div>
+
+  <div class="issue">
+    <h3><span class="id">04</span> MAY-26 and SEP-26 are partial months</h3>
+    <p>SEP-26 holds a single cycle, <code>NF_2026-09-01</code>, the last in the data, so its figures are not comparable with a full month's.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="step-no">&para;</span><h2>Design notes</h2></div>
+  <ul>
+    <li><strong>Nothing is silently corrected.</strong> Every drop is logged with its count, every anomaly is printed, and contradictory input raises instead of guessing.</li>
+    <li><strong>Timestamped output</strong> &mdash; runs never overwrite each other.</li>
+    <li><strong>CycleMTM is the audit trail.</strong> Every pivot cell traces back to it.</li>
+    <li>If Excel reports &ldquo;file format is not valid&rdquo;, the workbook was opened while it was still being written &mdash; a 5&nbsp;MB file takes about 12 seconds. Wait for the <code>Wrote &hellip;</code> log line, then delete any leftover <code>~$&hellip;.xlsx</code> lock file.</li>
+  </ul>
+</section>
+
+<footer>build_workbook.py &middot; data through 01-Sep-2026 &middot; figures regenerate on every run</footer>
+</div>
+</body>
+</html>
